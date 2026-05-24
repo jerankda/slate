@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd job for slate. AI ingestion workers.
+
+  Install:
+    cp backend/scripts/com.slate.workers.plist ~/Library/LaunchAgents/
+    # Edit the WorkingDirectory + OPENAI_API_KEY below to match your machine
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.slate.workers.plist
+    launchctl kickstart -k gui/$(id -u)/com.slate.workers  # run once now
+
+  Uninstall:
+    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.slate.workers.plist
+
+  Logs:
+    tail -f /tmp/slate-workers.out /tmp/slate-workers.err
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.slate.workers</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>cd "$WORKING_DIR" &amp;&amp; /usr/local/bin/npm run worker:all</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>WORKING_DIR</key>
+        <string>/REPLACE/WITH/ABSOLUTE/PATH/TO/mappygmae/backend</string>
+        <key>OPENAI_API_KEY</key>
+        <string>sk-REPLACE_ME</string>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Run every 6 hours -->
+    <key>StartInterval</key>
+    <integer>21600</integer>
+
+    <!-- Also run once at load (e.g. after login) -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/slate-workers.out</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/slate-workers.err</string>
+</dict>
+</plist>
