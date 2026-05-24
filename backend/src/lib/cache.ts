@@ -1,6 +1,7 @@
 import Redis from "ioredis";
 
 const url = process.env.REDIS_URL ?? "redis://localhost:6379";
+const redisDisabled = process.env.REDIS_DISABLED === "1" || !process.env.REDIS_URL;
 
 export const redis = new Redis(url, {
   lazyConnect: true,
@@ -8,13 +9,19 @@ export const redis = new Redis(url, {
   enableOfflineQueue: false,
 });
 
+let warnedOnce = false;
 redis.on("error", err => {
-  console.warn("redis error:", err.message);
+  if (warnedOnce) return;
+  warnedOnce = true;
+  console.warn(`redis unavailable (${err.message.split("\n")[0]}); continuing without cache`);
 });
 
 let connected = false;
+let tried = false;
 async function ensure() {
-  if (connected) return;
+  if (connected || redisDisabled) return;
+  if (tried) return;
+  tried = true;
   try { await redis.connect(); connected = true; }
   catch { /* offline-tolerant */ }
 }

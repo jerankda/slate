@@ -102,13 +102,17 @@ export async function upsertEvent(opts: {
 
   const startTime = new Date(opts.event.start_time_utc);
 
-  // Find-or-create on (sportId, title, startTimeUtc) — no unique index on those
-  // three together so we do this manually to keep the schema flexible.
+  // Find-or-create on (sportId, title, day). We don't use the full timestamp
+  // because the AI sometimes shifts the same fixture by a few minutes across
+  // runs (TBD kickoff, timezone tweaks). Day-bucketing is enough — no two
+  // top-tier games with identical titles happen on the same day.
+  const dayStart = new Date(startTime); dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
   const existing = await prisma.event.findFirst({
     where: {
       sportId: sport.id,
       title: opts.event.title,
-      startTimeUtc: startTime,
+      startTimeUtc: { gte: dayStart, lt: dayEnd },
     },
   });
 
@@ -116,6 +120,7 @@ export async function upsertEvent(opts: {
     ? await prisma.event.update({
         where: { id: existing.id },
         data: {
+          startTimeUtc: startTime,
           subtitle: opts.event.subtitle ?? null,
           venue: opts.event.venue ?? null,
           leagueId,
