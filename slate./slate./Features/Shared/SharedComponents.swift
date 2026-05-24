@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EventRow: View {
     let event: Event
+    @State private var store = NotificationStore.shared
     var sport: Sport { Sport.all.first(where: { $0.slug == event.sportSlug }) ?? Sport.all[0] }
 
     var body: some View {
@@ -24,6 +25,12 @@ struct EventRow: View {
                             .foregroundStyle(Theme.Color.muted)
                     }
                     if event.isLive { LivePill() }
+                    if store.isScheduled(eventId: event.id) {
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(Theme.Color.accent)
+                            .accessibilityLabel("Reminder set")
+                    }
                 }
                 Text(event.title)
                     .font(.system(size: 15, weight: .semibold))

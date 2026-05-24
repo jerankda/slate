@@ -3,8 +3,11 @@ import SwiftUI
 struct EventDetailView: View {
     let event: Event
     @Environment(AppEnvironment.self) private var env
-    @State private var notifyEnabled = false
+    @State private var store = NotificationStore.shared
+    @State private var lead: ReminderLead = .oneHour
     @State private var notifyBusy = false
+
+    private var notifyEnabled: Bool { store.isScheduled(eventId: event.id) }
 
     var sport: Sport { Sport.all.first(where: { $0.slug == event.sportSlug }) ?? Sport.all[0] }
 
@@ -28,7 +31,8 @@ struct EventDetailView: View {
         .background(Theme.Color.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            notifyEnabled = await NotificationManager.isScheduled(for: event)
+            await store.sync()
+            lead = ReminderLead(rawValue: store.leadMinutes(for: event)) ?? .oneHour
         }
     }
 
@@ -153,42 +157,74 @@ struct EventDetailView: View {
     // MARK: - Notify
 
     private var notifySection: some View {
-        Button {
-            Task { await toggleNotify() }
-        } label: {
-            HStack(spacing: Theme.Spacing.m) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(notifyEnabled ? Theme.Color.accent.opacity(0.15) : Theme.Color.muted.opacity(0.12))
-                    Image(systemName: notifyEnabled ? "bell.badge.fill" : "bell.fill")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(notifyEnabled ? Theme.Color.accent : Theme.Color.muted)
-                }
-                .frame(width: 44, height: 44)
+        VStack(spacing: Theme.Spacing.s) {
+            Button {
+                Task { await toggleNotify() }
+            } label: {
+                HStack(spacing: Theme.Spacing.m) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(notifyEnabled ? Theme.Color.accent.opacity(0.15) : Theme.Color.muted.opacity(0.12))
+                        Image(systemName: notifyEnabled ? "bell.badge.fill" : "bell.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(notifyEnabled ? Theme.Color.accent : Theme.Color.muted)
+                    }
+                    .frame(width: 44, height: 44)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(notifyEnabled ? "Reminder set" : "Notify me 1 hour before")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.Color.ink)
-                    Text(notifyEnabled ? "We'll ping you before kickoff" : "Local notification, no account needed")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.Color.muted)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(notifyEnabled ? "Reminder set · \(lead.label) before" : "Notify me before kickoff")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.Color.ink)
+                        Text(notifyEnabled ? "Tap to cancel" : "Local notification, no account needed")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    Spacer()
+                    Image(systemName: notifyEnabled ? "checkmark.circle.fill" : "plus.circle.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(notifyEnabled ? Theme.Color.accent : Theme.Color.muted.opacity(0.6))
                 }
-                Spacer()
-                Image(systemName: notifyEnabled ? "checkmark.circle.fill" : "plus.circle.fill")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(notifyEnabled ? Theme.Color.accent : Theme.Color.muted.opacity(0.6))
+                .padding(Theme.Spacing.m)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                        .fill(Theme.Color.surface)
+                )
+                .shadow(color: .black.opacity(0.06), radius: 18, x: 0, y: 6)
+                .opacity(notifyBusy ? 0.6 : 1)
             }
-            .padding(Theme.Spacing.m)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                    .fill(Theme.Color.surface)
-            )
-            .shadow(color: .black.opacity(0.06), radius: 18, x: 0, y: 6)
-            .opacity(notifyBusy ? 0.6 : 1)
+            .buttonStyle(.plain)
+            .disabled(notifyBusy)
+
+            if !notifyEnabled {
+                leadChips
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(notifyBusy)
+    }
+
+    private var leadChips: some View {
+        HStack(spacing: Theme.Spacing.s) {
+            ForEach(ReminderLead.allCases) { option in
+                let selected = lead == option
+                Button {
+                    lead = option
+                    Haptics.selection()
+                } label: {
+                    Text(option.label)
+                        .font(.system(size: 12, weight: .heavy))
+                        .kerning(0.5)
+                        .padding(.horizontal, Theme.Spacing.m)
+                        .padding(.vertical, 8)
+                        .foregroundStyle(selected ? .white : Theme.Color.ink)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(selected ? Theme.Color.ink : Theme.Color.surface)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 2)
     }
 
     private func venueRow(_ venue: String) -> some View {
@@ -216,12 +252,10 @@ struct EventDetailView: View {
         notifyBusy = true
         defer { notifyBusy = false }
         if notifyEnabled {
-            NotificationManager.cancel(for: event)
-            notifyEnabled = false
+            store.cancel(eventId: event.id)
             Haptics.selection()
         } else {
-            let ok = await NotificationManager.scheduleOneHourReminder(for: event)
-            notifyEnabled = ok
+            let ok = await store.schedule(event: event, leadMinutes: lead.rawValue)
             if ok { Haptics.success() } else { Haptics.warning() }
         }
     }

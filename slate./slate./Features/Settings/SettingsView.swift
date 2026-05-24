@@ -25,11 +25,9 @@ struct SettingsView: View {
                 .padding(.horizontal, Theme.Spacing.l)
 
                 SectionHeader("Notifications")
-                InfoCard(
-                    symbol: "bell.badge.fill",
-                    title: "Local reminders only",
-                    message: "v1 uses local notifications scheduled on-device. Push notifications are coming in v1.1."
-                )
+                VStack(spacing: Theme.Spacing.s) {
+                    RemindersCard()
+                }
                 .padding(.horizontal, Theme.Spacing.l)
 
                 SectionHeader("Data source")
@@ -301,5 +299,109 @@ private struct BackendStatusCard: View {
             error = EventRepository.shared.lastError
             savedAt = EventRepository.shared.lastSavedAt
         }
+    }
+}
+
+// MARK: - Reminders
+
+private struct RemindersCard: View {
+    @State private var store = NotificationStore.shared
+    @State private var showingConfirm = false
+
+    private var statusText: String {
+        switch store.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: return "Notifications enabled"
+        case .denied: return "Notifications disabled in iOS Settings"
+        case .notDetermined: return "Tap an event to enable reminders"
+        @unknown default: return "Unknown status"
+        }
+    }
+
+    private var statusColor: Color {
+        switch store.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: return Theme.Color.accent
+        case .denied: return Theme.Color.live
+        default: return Theme.Color.muted
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+            HStack(spacing: Theme.Spacing.m) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(statusColor.opacity(0.15))
+                    Image(systemName: "bell.badge.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(statusColor)
+                }
+                .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(store.scheduledEventIds.count) active reminder\(store.scheduledEventIds.count == 1 ? "" : "s")")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.ink)
+                    Text(statusText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+                Spacer()
+            }
+
+            if store.authorizationStatus == .denied {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Text("Open iOS Settings")
+                        .font(.system(size: 13, weight: .heavy))
+                        .kerning(0.5)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Theme.Spacing.l)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                        .background(Capsule(style: .continuous).fill(Theme.Color.ink))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !store.scheduledEventIds.isEmpty {
+                Button(role: .destructive) {
+                    showingConfirm = true
+                } label: {
+                    Text("Clear all reminders")
+                        .font(.system(size: 13, weight: .heavy))
+                        .kerning(0.5)
+                        .foregroundStyle(Theme.Color.live)
+                        .padding(.horizontal, Theme.Spacing.l)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Capsule(style: .continuous)
+                                .stroke(Theme.Color.live.opacity(0.4), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .confirmationDialog(
+                    "Clear all reminders?",
+                    isPresented: $showingConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Clear all", role: .destructive) {
+                        store.clearAll()
+                        Haptics.warning()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
+            }
+        }
+        .padding(Theme.Spacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                .fill(Theme.Color.surface)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 14, x: 0, y: 4)
+        .task { await store.sync() }
     }
 }
