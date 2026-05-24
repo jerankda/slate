@@ -307,6 +307,7 @@ private struct BackendStatusCard: View {
 private struct RemindersCard: View {
     @State private var store = NotificationStore.shared
     @State private var showingConfirm = false
+    @State private var showingList = false
 
     private var statusText: String {
         switch store.authorizationStatus {
@@ -367,22 +368,38 @@ private struct RemindersCard: View {
             }
 
             if !store.scheduledEventIds.isEmpty {
-                Button(role: .destructive) {
-                    showingConfirm = true
-                } label: {
-                    Text("Clear all reminders")
-                        .font(.system(size: 13, weight: .heavy))
-                        .kerning(0.5)
-                        .foregroundStyle(Theme.Color.live)
-                        .padding(.horizontal, Theme.Spacing.l)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            Capsule(style: .continuous)
-                                .stroke(Theme.Color.live.opacity(0.4), lineWidth: 1)
-                        )
+                HStack(spacing: Theme.Spacing.s) {
+                    Button {
+                        showingList = true
+                    } label: {
+                        Text("Manage")
+                            .font(.system(size: 13, weight: .heavy))
+                            .kerning(0.5)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, Theme.Spacing.l)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(Capsule(style: .continuous).fill(Theme.Color.ink))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(role: .destructive) {
+                        showingConfirm = true
+                    } label: {
+                        Text("Clear all")
+                            .font(.system(size: 13, weight: .heavy))
+                            .kerning(0.5)
+                            .foregroundStyle(Theme.Color.live)
+                            .padding(.horizontal, Theme.Spacing.l)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .stroke(Theme.Color.live.opacity(0.4), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
                 .confirmationDialog(
                     "Clear all reminders?",
                     isPresented: $showingConfirm,
@@ -402,6 +419,9 @@ private struct RemindersCard: View {
                 .fill(Theme.Color.surface)
         )
         .shadow(color: .black.opacity(0.05), radius: 14, x: 0, y: 4)
+        .sheet(isPresented: $showingList) {
+            RemindersListView()
+        }
         .task { await store.sync() }
     }
 }
