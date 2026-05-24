@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: slate-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: slate
+      POSTGRES_PASSWORD: slate
+      POSTGRES_DB: slate
+    ports:
+      - "5432:5432"
+    volumes:
+      - slate_pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: slate-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - slate_redis_data:/data
+
+volumes:
+  slate_pg_data:
+  slate_redis_data:

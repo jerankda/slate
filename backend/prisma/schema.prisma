@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Sport {
+  id      String   @id @default(cuid())
+  slug    String   @unique
+  name    String
+  icon    String
+  leagues League[]
+  events  Event[]
+}
+
+model League {
+  id        String  @id @default(cuid())
+  sportId   String
+  slug      String
+  name      String
+  country   String?
+  sport     Sport   @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  teams     Team[]
+  events    Event[]
+
+  @@unique([sportId, slug])
+}
+
+model Team {
+  id        String  @id @default(cuid())
+  leagueId  String
+  name      String
+  shortName String?
+  logoUrl   String?
+  league    League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeEvents Event[] @relation("HomeTeam")
+  awayEvents Event[] @relation("AwayTeam")
+
+  @@unique([leagueId, name])
+}
+
+model Event {
+  id           String        @id @default(cuid())
+  sportId      String
+  leagueId     String?
+  homeTeamId   String?
+  awayTeamId   String?
+  title        String
+  subtitle     String?
+  startTimeUtc DateTime
+  status       String        @default("scheduled")
+  venue        String?
+  rawAiLogId   String?
+
+  sport        Sport         @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  league       League?       @relation(fields: [leagueId], references: [id], onDelete: SetNull)
+  homeTeam     Team?         @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull)
+  awayTeam     Team?         @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull)
+  rawAiLog     RawAiLog?     @relation(fields: [rawAiLogId], references: [id], onDelete: SetNull)
+  participants Participant[]
+  broadcasts   Broadcast[]
+
+  @@index([sportId, startTimeUtc])
+  @@index([startTimeUtc])
+}
+
+model Participant {
+  id      String  @id @default(cuid())
+  eventId String
+  name    String
+  role    String?
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Broadcast {
+  id          String        @id @default(cuid())
+  eventId     String
+  countryCode String
+  providerId  String
+  kind        String
+
+  event       Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  provider    Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, countryCode, providerId, kind])
+  @@index([eventId, countryCode])
+}
+
+model Provider {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  logoUrl    String?
+  website    String?
+  broadcasts Broadcast[]
+}
+
+model RawAiLog {
+  id        String   @id @default(cuid())
+  worker    String
+  prompt    String
+  response  String
+  createdAt DateTime @default(now())
+  events    Event[]
+
+  @@index([worker, createdAt])
+}
