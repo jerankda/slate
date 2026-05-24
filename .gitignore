@@ -1,0 +1,28 @@
+.DS_Store
+*.log
+*.swp
+*.tmp
+
+# macOS / Xcode
+xcuserdata/
+*.xcuserstate
+build/
+DerivedData/
+*.moved-aside
+*.xcscmblueprint
+*.xccheckout
+
+# Node / backend
+node_modules/
+dist/
+.env
+
+# Prisma local DB
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+backend/prisma/migrations/
+
+# iCloud cruft
+.iCloud
+.AppleDouble
+.LSOverride
